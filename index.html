@@ -1,1 +1,198 @@
-<h1>Hello Cloudflare!</h1>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Porsche 911 GT3R - iPad Drive</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a0a; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
+        #game-canvas { width: 100vw; height: 100vh; display: block; }
+        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; z-index: 10; }
+        
+        .ui-btn {
+            position: absolute; width: 90px; height: 90px; background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%; color: white;
+            font-size: 32px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+            touch-action: none; z-index: 5;
+        }
+        .ui-btn:active { background: rgba(255, 255, 255, 0.4); }
+        #btn-left { bottom: 40px; left: 40px; }
+        #btn-right { bottom: 40px; left: 160px; }
+        #btn-accel { bottom: 140px; right: 50px; background: rgba(0, 255, 100, 0.2); border-color: rgba(0, 255, 100, 0.5); }
+        #btn-brake { bottom: 30px; right: 50px; background: rgba(255, 50, 50, 0.2); border-color: rgba(255, 50, 50, 0.5); }
+        
+        #hud { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; font-family: monospace; z-index: 5; text-shadow: 2px 2px 4px #000; }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+<body>
+    <div id="loading">ポルシェ起動中...</div>
+    <div id="hud"><span style="color:#00ff64;">911 GT3 R</span><br><span id="speedo">0</span> km/h</div>
+    
+    <div class="ui-btn" id="btn-left">←</div>
+    <div class="ui-btn" id="btn-right">→</div>
+    <div class="ui-btn" id="btn-accel">▲</div>
+    <div class="ui-btn" id="btn-brake">▼</div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050508);
+        scene.fog = new THREE.FogExp2(0x050508, 0.01);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        const environment = new RoomEnvironment(renderer);
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmremGenerator.fromScene(environment).texture;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        const grid = new THREE.GridHelper(1000, 200, 0x333344, 0x111122);
+        scene.add(grid);
+
+        const controls = { forward: false, backward: false, left: false, right: false };
+
+        function bindTouch(elementId, controlKey) {
+            const btn = document.getElementById(elementId);
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); controls[controlKey] = true; });
+            btn.addEventListener('touchend', () => { controls[controlKey] = false; });
+        }
+        bindTouch('btn-left', 'left');
+        bindTouch('btn-right', 'right');
+        bindTouch('btn-accel', 'forward');
+        bindTouch('btn-brake', 'backward');
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w') controls.forward = true;
+            if (e.key === 'ArrowDown' || e.key === 's') controls.backward = true;
+            if (e.key === 'ArrowLeft' || e.key === 'a') controls.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') controls.right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w') controls.forward = false;
+            if (e.key === 'ArrowDown' || e.key === 's') controls.backward = false;
+            if (e.key === 'ArrowLeft' || e.key === 'a') controls.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') controls.right = false;
+        });
+
+        let porsche = null;
+        const allWheels = [];
+        const frontWheels = [];
+
+        let carSpeed = 0;
+        let carAngle = 0;
+        
+        const MAX_SPEED = 0.8;
+        const ACCEL = 0.012;
+        const BRAKE = 0.025;
+        const FRICTION = 0.005;
+        const TURN_SPEED = 0.025;
+
+        const loader = new GLTFLoader();
+        loader.load(
+            './911GT3R.glb',
+            function (gltf) {
+                porsche = gltf.scene;
+                porsche.position.set(0, 0, 0);
+                scene.add(porsche);
+
+                porsche.traverse((child) => {
+                    if (child.isMesh) {
+                        const name = child.name.toLowerCase();
+                        if (name.includes('wheel') || name.includes('tire') || name.includes('rim')) {
+                            allWheels.push(child);
+                            if (name.includes('front') || name.includes('_fl') || name.includes('_fr')) {
+                                frontWheels.push(child);
+                            }
+                        }
+                    }
+                });
+
+                document.getElementById('loading').style.display = 'none';
+            },
+            undefined,
+            function (error) {
+                document.getElementById('loading').innerText = "Load Error";
+            }
+        );
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const speedoElement = document.getElementById('speedo');
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (porsche) {
+                if (controls.forward) {
+                    carSpeed += ACCEL;
+                    if (carSpeed > MAX_SPEED) carSpeed = MAX_SPEED;
+                } else if (controls.backward) {
+                    carSpeed -= BRAKE;
+                    if (carSpeed < -MAX_SPEED * 0.4) carSpeed = -MAX_SPEED * 0.4;
+                } else {
+                    if (carSpeed > 0) carSpeed = Math.max(0, carSpeed - FRICTION);
+                    if (carSpeed < 0) carSpeed = Math.min(0, carSpeed + FRICTION);
+                }
+
+                if (Math.abs(carSpeed) > 0.01) {
+                    const turnFactor = carSpeed > 0 ? 1 : -1;
+                    if (controls.left) carAngle += TURN_SPEED * turnFactor * (Math.abs(carSpeed) + 0.2);
+                    if (controls.right) carAngle -= TURN_SPEED * turnFactor * (Math.abs(carSpeed) + 0.2);
+                }
+
+                porsche.rotation.y = carAngle;
+                porsche.translateZ(carSpeed);
+
+                allWheels.forEach(wheel => {
+                    wheel.rotation.x += carSpeed * 0.4;
+                });
+
+                let targetSteerAngle = 0;
+                if (controls.left) targetSteerAngle = 0.35;
+                if (controls.right) targetSteerAngle = -0.35;
+
+                frontWheels.forEach(wheel => {
+                    wheel.rotation.y += (targetSteerAngle - wheel.rotation.y) * 0.15;
+                });
+
+                speedoElement.innerText = Math.round(Math.abs(carSpeed) * 300);
+
+                const relativeCameraOffset = new THREE.Vector3(0, 1.0, -2.5);
+                const cameraOffset = relativeCameraOffset.applyMatrix4(porsche.matrixWorld);
+                camera.position.copy(cameraOffset);
+                camera.lookAt(porsche.position.clone().add(new THREE.Vector3(0, 0.4, 0)));
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
