@@ -134,7 +134,7 @@
             },
             undefined,
             function (error) {
-                document.getElementById('loading').innerText = "Load Error";
+                document.getElementById('loading').innerText = "エラー詳細: " + error.message;
             }
         );
 
