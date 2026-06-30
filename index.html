@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Porsche 911 GT3R - iPad Drive</title>
+    <script src="https://unpkg.com/meshoptimizer@0.21.0/meshopt_decoder.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #0a0a0a; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
         #game-canvas { width: 100vw; height: 100vh; display: block; }
@@ -110,7 +111,7 @@
         const FRICTION = 0.005;
         const TURN_SPEED = 0.025;
 
-        const loader = new GLTFLoader();
+        const loader = new GLTFLoader();loader.setMeshoptDecoder(window.MeshoptDecoder);
         loader.load(
             './911GT3R.glb',
             function (gltf) {
