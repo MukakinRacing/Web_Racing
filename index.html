@@ -104,7 +104,32 @@
 
         let carSpeed = 0;
         let carAngle = 0;
-        
+
+        let camAngleX = 0;
+let camAngleY = 2; 
+let isDragging = false;
+let prevX = 0;
+let prevY = 0;
+
+document.addEventListener('pointerdown', (e) => {
+    if (e.target.tagName !== 'CANVAS') return;
+    isDragging = true;
+    prevX = e.clientX;
+    prevY = e.clientY;
+});
+document.addEventListener('pointermove', (e) => {
+    if (isDragging) {
+        camAngleX -= (e.clientX - prevX) * 0.01; 
+        camAngleY += (e.clientY - prevY) * 0.01; 
+        if (camAngleY < 0.1) camAngleY = 0.1;
+        if (camAngleY > 5) camAngleY = 5;
+        prevX = e.clientX;
+        prevY = e.clientY;
+    }
+});
+document.addEventListener('pointerup', () => {
+    isDragging = false;
+});
         const MAX_SPEED = 0.8;
         const ACCEL = 0.012;
         const BRAKE = 0.025;
@@ -118,6 +143,7 @@
                 porsche = gltf.scene;
                 porsche.position.set(0, 0, 0);
                 scene.add(porsche);
+                porsche.rotation.y = -Math.PI / 2;
 const roadGeo = new THREE.PlaneGeometry(15, 25000);
         const roadMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
         const road = new THREE.Mesh(roadGeo, roadMat);
@@ -197,15 +223,17 @@ const roadGeo = new THREE.PlaneGeometry(15, 25000);
                     wheel.rotation.y += (targetSteerAngle - wheel.rotation.y) * 0.15;
                 });
 
-                speedoElement.innerText = Math.round(Math.abs(carSpeed) * 300);
+speedElement.innerText = Math.round(Math.abs(carSpeed) * 300);
 
-                const relativeCameraOffset = new THREE.Vector3(0, 1.0, -2.5);
-                const cameraOffset = relativeCameraOffset.applyMatrix4(porsche.matrixWorld);
-                camera.position.copy(cameraOffset);
-                camera.lookAt(porsche.position.clone().add(new THREE.Vector3(0, 0.4, 0)));
-            }
+        const radius = 6;
+        camera.position.x = porsche.position.x + Math.sin(camAngleX) * radius;
+        camera.position.y = porsche.position.y + camAngleY;
+        camera.position.z = porsche.position.z + Math.cos(camAngleX) * radius;
+        camera.lookAt(porsche.position);
+    }
 
-            renderer.render(scene, camera);
+    renderer.render(scene, camera);
+}
         }
         animate();
     </script>
