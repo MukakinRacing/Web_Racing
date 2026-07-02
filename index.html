@@ -118,7 +118,21 @@
                 porsche = gltf.scene;
                 porsche.position.set(0, 0, 0);
                 scene.add(porsche);
+const roadGeo = new THREE.PlaneGeometry(15, 25000);
+        const roadMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.position.set(0, -0.05, 0);
+        scene.add(road);
 
+        for (let i = -500; i < 500; i++) {
+            const lineGeo = new THREE.PlaneGeometry(0.3, 8);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const line = new THREE.Mesh(lineGeo, lineMat);
+            line.rotation.x = -Math.PI / 2;
+            line.position.set(0, -0.04, i * 25);
+            scene.add(line);
+        }
                 porsche.traverse((child) => {
                     if (child.isMesh) {
                         const name = child.name.toLowerCase();
