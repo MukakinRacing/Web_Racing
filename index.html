@@ -187,43 +187,21 @@ const roadGeo = new THREE.PlaneGeometry(15, 25000);
 
         const speedoElement = document.getElementById('speedo');
 
-        function animate() {
-            requestAnimationFrame(animate);
+   function animate() {
+    requestAnimationFrame(animate);
 
-            if (porsche) {
-                if (controls.forward) {
-                    carSpeed += ACCEL;
-                    if (carSpeed > MAX_SPEED) carSpeed = MAX_SPEED;
-                } else if (controls.backward) {
-                    carSpeed -= BRAKE;
-                    if (carSpeed < -MAX_SPEED * 0.4) carSpeed = -MAX_SPEED * 0.4;
-                } else {
-                    if (carSpeed > 0) carSpeed = Math.max(0, carSpeed - FRICTION);
-                    if (carSpeed < 0) carSpeed = Math.min(0, carSpeed + FRICTION);
-                }
+    if (Math.abs(carSpeed) > 0.01) {
+        const turnFactor = carSpeed > 0 ? 1 : -1;
+        if (controls.left) carAngle += TURN_SPEED * turnFactor * (Math.abs(carSpeed) * 300);
+        if (controls.right) carAngle -= TURN_SPEED * turnFactor * (Math.abs(carSpeed) * 300);
+    }
+    porsche.rotation.y = carAngle;
+    porsche.translateZ(carSpeed);
 
-                if (Math.abs(carSpeed) > 0.01) {
-                    const turnFactor = carSpeed > 0 ? 1 : -1;
-                    if (controls.left) carAngle += TURN_SPEED * turnFactor * (Math.abs(carSpeed) + 0.2);
-                    if (controls.right) carAngle -= TURN_SPEED * turnFactor * (Math.abs(carSpeed) + 0.2);
-                }
-
-                porsche.rotation.y = carAngle;
-                porsche.translateZ(carSpeed);
-
-                allWheels.forEach(wheel => {
-                    wheel.rotation.x += carSpeed * 0.4;
-                });
-
-                let targetSteerAngle = 0;
-                if (controls.left) targetSteerAngle = 0.35;
-                if (controls.right) targetSteerAngle = -0.35;
-
-                frontWheels.forEach(wheel => {
-                    wheel.rotation.y += (targetSteerAngle - wheel.rotation.y) * 0.15;
-                });
-
-speedElement.innerText = Math.round(Math.abs(carSpeed) * 300);
+    if (porsche) {
+        allWheels.forEach(wheel => {
+            wheel.rotation.x -= carSpeed * 0.1;
+        });
 
         const radius = 6;
         camera.position.x = porsche.position.x + Math.sin(camAngleX) * radius;
@@ -234,8 +212,8 @@ speedElement.innerText = Math.round(Math.abs(carSpeed) * 300);
 
     renderer.render(scene, camera);
 }
-        }
-        animate();
+
+animate();
     </script>
 </body>
 </html>
