@@ -10,7 +10,6 @@
     <script src="https://unpkg.com/meshoptimizer@0.21.0/meshopt_decoder.js"></script>
 
     <style>
-        /* 📱 修正: 画面下の水色の隙間を完全に消すための絶対配置設定 */
         html, body { 
             margin: 0; 
             padding: 0;
@@ -21,7 +20,7 @@
             font-family: sans-serif; 
             user-select: none; 
             -webkit-user-select: none; 
-            touch-action: none; /* スワイプによるブラウザ画面のズレを防止 */
+            touch-action: none; 
         }
         #game-canvas { 
             position: absolute;
@@ -128,7 +127,6 @@
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1500);
         
-        // 🛠 修正: 遠景のチカチカを防ぐ強力な設定（logarithmicDepthBuffer）を追加
         const renderer = new THREE.WebGLRenderer({ 
             canvas: canvas, 
             antialias: true,
@@ -230,29 +228,36 @@
                 porsche.rotation.y = -Math.PI / 2;
                 scene.add(porsche);
 
-                // 🛞 修正: メッシュ縛りをやめ、タイヤの親グループごと一括で取得する強力なロジック
-                const wheelKeywords = ['wheel', 'tire', 'rim', 'hub', 'front_left', 'front_right', 'rear_left', 'rear_right', 'fl_', 'fr_', 'rl_', 'rr_'];
-                const excludeKeywords = ['caliper', 'brake', 'disc', 'steer'];
+                // 🛞 修正: メッシュ名・マテリアル名・親フォルダ名すべてをチェックしてタイヤを炙り出す
+                const wheelKeywords = ['wheel', 'tire', 'rim', 'hub', 'rubber', 'alloy', 'pneu'];
+                const excludeKeywords = ['caliper', 'brake', 'disc', 'rotor', 'steer', 'body', 'glass', 'chassis'];
 
                 porsche.traverse((child) => {
-                    const name = child.name.toLowerCase();
-                    const isMatch = wheelKeywords.some(kw => name.includes(kw)) && !excludeKeywords.some(kw => name.includes(kw));
-
-                    if (isMatch) {
-                        // 親がすでにリストに入っていないか確認（二重回転を防ぐため）
-                        let hasWheelParent = false;
-                        let current = child.parent;
-                        while (current) {
-                            if (allWheels.includes(current)) {
-                                hasWheelParent = true;
-                                break;
+                    if (child.isMesh) {
+                        let searchString = child.name.toLowerCase();
+                        
+                        // マテリアルの名前もチェックに含める
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                searchString += " " + child.material.map(m => m.name.toLowerCase()).join(' ');
+                            } else if (child.material.name) {
+                                searchString += " " + child.material.name.toLowerCase();
                             }
-                            current = current.parent;
+                        }
+                        
+                        // 親グループの名前もチェックに含める
+                        if (child.parent && child.parent.name) {
+                            searchString += " " + child.parent.name.toLowerCase();
                         }
 
-                        if (!hasWheelParent) {
-                            allWheels.push(child);
-                            if (name.includes('front') || name.includes('f_') || name.includes('_f') || name.includes('fl') || name.includes('fr')) {
+                        // キーワードに一致するかチェック（ブレーキ部品などは除外）
+                        const isMatch = wheelKeywords.some(kw => searchString.includes(kw)) && !excludeKeywords.some(kw => searchString.includes(kw));
+
+                        if (isMatch) {
+                            allWheels.push(child); // タイヤリストに追加
+                            
+                            // 前輪ならステアリング（左右の曲がり）用のリストにも追加
+                            if (searchString.includes('front') || searchString.includes(' fl ') || searchString.includes(' fr ') || searchString.includes('f_') || searchString.includes('_f')) {
                                 frontWheels.push(child);
                             }
                         }
@@ -268,7 +273,6 @@
             }
         );
 
-        // 🛣️ 修正: polygonOffsetを使って、面が重なっても絶対にチカチカしないように描画順を設定
         const roadGeo = new THREE.PlaneGeometry(15, 25000);
         const roadMat = new THREE.MeshBasicMaterial({ 
             color: 0x2e2e2e,
@@ -296,7 +300,7 @@
             const lineMat = new THREE.MeshBasicMaterial({ 
                 color: 0xffffff,
                 polygonOffset: true,
-                polygonOffsetFactor: 0, // 0が一番手前に描画される
+                polygonOffsetFactor: 0, 
                 polygonOffsetUnits: 0
             });
             const line = new THREE.Mesh(lineGeo, lineMat);
@@ -332,13 +336,15 @@
                 porsche.position.x += Math.sin(carAngle) * carSpeed;
                 porsche.position.z += Math.cos(carAngle) * carSpeed;
 
-                tireRotation -= carSpeed * 2.5;
+                // 🛞 修正: 回転角を累積してタイヤを転がす
+                tireRotation -= carSpeed * 0.5; // 回転スピード
                 
                 allWheels.forEach(wheel => {
-                    wheel.rotation.order = 'YXZ'; 
+                    wheel.rotation.order = 'YXZ'; // 回転の計算順序を固定
                     wheel.rotation.x = tireRotation;
                 });
 
+                // ハンドルの切れ角（前輪の左右）
                 let targetSteer = 0;
                 if (controls.left) targetSteer = 0.4;
                 if (controls.right) targetSteer = -0.4;
