@@ -10,20 +10,23 @@
     <script src="https://unpkg.com/meshoptimizer@0.21.0/meshopt_decoder.js"></script>
 
     <style>
-        /* 📱 修正: 画面下の水色の隙間を消すための設定 */
+        /* 📱 修正: 画面下の水色の隙間を完全に消すための絶対配置設定 */
         html, body { 
             margin: 0; 
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden; 
-            position: fixed; /* iOS Safariのスクロールバウンス対策 */
             background: #87ceeb; 
             font-family: sans-serif; 
             user-select: none; 
             -webkit-user-select: none; 
+            touch-action: none; /* スワイプによるブラウザ画面のズレを防止 */
         }
         #game-canvas { 
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%; 
             height: 100%; 
             display: block; 
@@ -123,10 +126,14 @@
         scene.background = new THREE.Color(0x87ceeb);
         scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
 
-        // 📷 修正: near（手前の表示限界）を 0.1 から 1 に変更して、遠景のチカチカを防止
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1500);
         
-        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        // 🛠 修正: 遠景のチカチカを防ぐ強力な設定（logarithmicDepthBuffer）を追加
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: canvas, 
+            antialias: true,
+            logarithmicDepthBuffer: true 
+        });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -148,7 +155,7 @@
 
         let carSpeed = 0;
         let carAngle = 0;
-        let tireRotation = 0; // 🛞 修正: タイヤの回転角度を記録する変数を追加
+        let tireRotation = 0;
 
         const MAX_SPEED = 0.8;
         const ACCEL = 0.012;
@@ -223,12 +230,29 @@
                 porsche.rotation.y = -Math.PI / 2;
                 scene.add(porsche);
 
+                // 🛞 修正: メッシュ縛りをやめ、タイヤの親グループごと一括で取得する強力なロジック
+                const wheelKeywords = ['wheel', 'tire', 'rim', 'hub', 'front_left', 'front_right', 'rear_left', 'rear_right', 'fl_', 'fr_', 'rl_', 'rr_'];
+                const excludeKeywords = ['caliper', 'brake', 'disc', 'steer'];
+
                 porsche.traverse((child) => {
-                    if (child.isMesh) {
-                        const name = child.name.toLowerCase();
-                        if (name.includes('wheel') || name.includes('tire') || name.includes('rim') || name.includes('hub')) {
+                    const name = child.name.toLowerCase();
+                    const isMatch = wheelKeywords.some(kw => name.includes(kw)) && !excludeKeywords.some(kw => name.includes(kw));
+
+                    if (isMatch) {
+                        // 親がすでにリストに入っていないか確認（二重回転を防ぐため）
+                        let hasWheelParent = false;
+                        let current = child.parent;
+                        while (current) {
+                            if (allWheels.includes(current)) {
+                                hasWheelParent = true;
+                                break;
+                            }
+                            current = current.parent;
+                        }
+
+                        if (!hasWheelParent) {
                             allWheels.push(child);
-                            if (name.includes('front') || name.includes('_fl') || name.includes('_fr')) {
+                            if (name.includes('front') || name.includes('f_') || name.includes('_f') || name.includes('fl') || name.includes('fr')) {
                                 frontWheels.push(child);
                             }
                         }
@@ -244,27 +268,40 @@
             }
         );
 
+        // 🛣️ 修正: polygonOffsetを使って、面が重なっても絶対にチカチカしないように描画順を設定
         const roadGeo = new THREE.PlaneGeometry(15, 25000);
-        const roadMat = new THREE.MeshBasicMaterial({ color: 0x2e2e2e });
+        const roadMat = new THREE.MeshBasicMaterial({ 
+            color: 0x2e2e2e,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1 
+        });
         const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
-        road.position.set(0, -0.02, 0); 
         scene.add(road);
 
-        // 🌿 修正: チカチカしないように地面をさらに下げる
         const groundGeo = new THREE.PlaneGeometry(2000, 25000);
-        const groundMat = new THREE.MeshBasicMaterial({ color: 0x3b7a57 });
+        const groundMat = new THREE.MeshBasicMaterial({ 
+            color: 0x3b7a57,
+            polygonOffset: true,
+            polygonOffsetFactor: 2,
+            polygonOffsetUnits: 2
+        });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
-        ground.position.set(0, -0.2, 0); 
         scene.add(ground);
 
         for (let i = -500; i < 500; i++) {
             const lineGeo = new THREE.PlaneGeometry(0.3, 8);
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const lineMat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff,
+                polygonOffset: true,
+                polygonOffsetFactor: 0, // 0が一番手前に描画される
+                polygonOffsetUnits: 0
+            });
             const line = new THREE.Mesh(lineGeo, lineMat);
             line.rotation.x = -Math.PI / 2;
-            line.position.set(0, 0.02, i * 25); // ⚪ 修正: 白線を少し上げてチカチカ防止
+            line.position.set(0, 0, i * 25);
             scene.add(line);
         }
 
@@ -295,11 +332,10 @@
                 porsche.position.x += Math.sin(carAngle) * carSpeed;
                 porsche.position.z += Math.cos(carAngle) * carSpeed;
 
-                // 🛞 修正: タイヤの回転スピードを本物っぽく速くし、曲がるときも干渉せずに回るようにする
                 tireRotation -= carSpeed * 2.5;
                 
                 allWheels.forEach(wheel => {
-                    wheel.rotation.order = 'YXZ'; // 回転の順番をステアリング(Y) -> 前進(X)にする
+                    wheel.rotation.order = 'YXZ'; 
                     wheel.rotation.x = tireRotation;
                 });
 
