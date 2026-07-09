@@ -115,7 +115,6 @@
         const canvas = document.getElementById('game-canvas');
         const scene = new THREE.Scene();
         
-        // 背景を青空の色にして、遠くに行くほど空に溶け込むフォグ（霧）を設定
         scene.background = new THREE.Color(0x87ceeb);
         scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
 
@@ -124,8 +123,15 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-        scene.add(ambientLight);
+        // 🚘 修正：GLTFモデルの色が黒くならないようにレンダラーの色調補正をオンにする
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        // 💡 修正：全体を明るく照らすための環境光（HemisphereLight）を追加
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
 
         const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight1.position.set(20, 40, 20);
@@ -232,29 +238,27 @@
             }
         );
 
-        // 🛣️ 道路の作成
+        // 🛣️ 修正：道路、地面、白線の高さ（Y軸）の隙間を広げて、点滅（重なり）を防ぐ
         const roadGeo = new THREE.PlaneGeometry(15, 25000);
         const roadMat = new THREE.MeshBasicMaterial({ color: 0x2e2e2e });
         const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
-        road.position.set(0, -0.05, 0);
+        road.position.set(0, -0.02, 0); // 道路
         scene.add(road);
 
-        // 🌿 草原（緑の地面プレート）の作成
         const groundGeo = new THREE.PlaneGeometry(2000, 25000);
         const groundMat = new THREE.MeshBasicMaterial({ color: 0x3b7a57 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
-        ground.position.set(0, -0.06, 0);
+        ground.position.set(0, -0.05, 0); // 地面（一番下）
         scene.add(ground);
 
-        // ⚪ センターラインの配置
         for (let i = -500; i < 500; i++) {
             const lineGeo = new THREE.PlaneGeometry(0.3, 8);
             const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const line = new THREE.Mesh(lineGeo, lineMat);
             line.rotation.x = -Math.PI / 2;
-            line.position.set(0, -0.04, i * 25);
+            line.position.set(0, 0.01, i * 25); // 白線（一番上）
             scene.add(line);
         }
 
@@ -285,12 +289,11 @@
                 porsche.position.x += Math.sin(carAngle) * carSpeed;
                 porsche.position.z += Math.cos(carAngle) * carSpeed;
 
-                // タイヤをローカル軸で回転させることで確実に自転させる
+                // 🛞 修正：タイヤの回転軸を確実に反映させる処理
                 allWheels.forEach(wheel => {
-                    wheel.rotateX(-carSpeed * 0.3);
+                    wheel.rotation.x -= carSpeed * 0.3;
                 });
 
-                // 曲がるときに前輪を傾ける（ステアリング処理）
                 let targetSteer = 0;
                 if (controls.left) targetSteer = 0.35;
                 if (controls.right) targetSteer = -0.35;
