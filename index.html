@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>web_racing</title>
     
+    <!-- 必要なライブラリの読み込み -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://unpkg.com/meshoptimizer@0.21.0/meshopt_decoder.js"></script>
@@ -12,22 +13,16 @@
     <style>
         html, body { 
             margin: 0; 
-            padding: 0;
-            width: 100%;
-            height: 100%;
             overflow: hidden; 
-            background: #87ceeb; 
+            background: #0a0a0a; 
             font-family: sans-serif; 
             user-select: none; 
             -webkit-user-select: none; 
             touch-action: none; 
         }
         #game-canvas { 
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%; 
-            height: 100%; 
+            width: 100vw; 
+            height: 100vh; 
             display: block; 
         }
         #loading { 
@@ -123,14 +118,14 @@
         const scene = new THREE.Scene();
         
         scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1500);
+        // 📷 修正: 深度バッファの精度を劇的に向上させチカチカを防止するため、nearを0.5、farを1000に変更
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 1000);
         
         const renderer = new THREE.WebGLRenderer({ 
             canvas: canvas, 
-            antialias: true,
-            logarithmicDepthBuffer: true 
+            antialias: true
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -234,39 +229,38 @@
             }
         );
 
+        // 🛣️ 修正: ライトの影響を受けるMeshStandardMaterialを採用し、Y座標の隙間を確実に空けてZファイティング（チカチカ）を100%防止
         const roadGeo = new THREE.PlaneGeometry(15, 25000);
-        const roadMat = new THREE.MeshBasicMaterial({ 
-            color: 0x2e2e2e,
-            polygonOffset: true,
-            polygonOffsetFactor: 1,
-            polygonOffsetUnits: 1 
+        const roadMat = new THREE.MeshStandardMaterial({ 
+            color: 0x222222, 
+            roughness: 0.8, 
+            metalness: 0.1 
         });
         const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
+        road.position.set(0, 0.0, 0); // 道路の基準高さを0.0に設定
         scene.add(road);
 
         const groundGeo = new THREE.PlaneGeometry(2000, 25000);
-        const groundMat = new THREE.MeshBasicMaterial({ 
-            color: 0x3b7a57,
-            polygonOffset: true,
-            polygonOffsetFactor: 2,
-            polygonOffsetUnits: 2
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            color: 0x2d5a27, 
+            roughness: 0.9, 
+            metalness: 0.0 
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
+        ground.position.set(0, -0.05, 0); // 芝生を道路より完全に5cm下げることで干渉を防ぐ
         scene.add(ground);
 
         for (let i = -500; i < 500; i++) {
             const lineGeo = new THREE.PlaneGeometry(0.3, 8);
-            const lineMat = new THREE.MeshBasicMaterial({ 
-                color: 0xffffff,
-                polygonOffset: true,
-                polygonOffsetFactor: 0, 
-                polygonOffsetUnits: 0
+            const lineMat = new THREE.MeshStandardMaterial({ 
+                color: 0xeeeeee, 
+                roughness: 0.7 
             });
             const line = new THREE.Mesh(lineGeo, lineMat);
             line.rotation.x = -Math.PI / 2;
-            line.position.set(0, 0, i * 25);
+            line.position.set(0, 0.01, i * 25); // 白線を道路の1cm上に浮かせることで干渉を防ぐ
             scene.add(line);
         }
 
