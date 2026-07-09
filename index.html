@@ -153,7 +153,6 @@
 
         let carSpeed = 0;
         let carAngle = 0;
-        let tireRotation = 0;
 
         const MAX_SPEED = 0.8;
         const ACCEL = 0.012;
@@ -214,8 +213,6 @@
         });
 
         let porsche = null;
-        let allWheels = [];
-        let frontWheels = [];
 
         const loader = new THREE.GLTFLoader();
         loader.setMeshoptDecoder(window.MeshoptDecoder);
@@ -227,42 +224,6 @@
                 porsche.position.set(0, 0, 0);
                 porsche.rotation.y = -Math.PI / 2;
                 scene.add(porsche);
-
-                // 🛞 修正: メッシュ名・マテリアル名・親フォルダ名すべてをチェックしてタイヤを炙り出す
-                const wheelKeywords = ['wheel', 'tire', 'rim', 'hub', 'rubber', 'alloy', 'pneu'];
-                const excludeKeywords = ['caliper', 'brake', 'disc', 'rotor', 'steer', 'body', 'glass', 'chassis'];
-
-                porsche.traverse((child) => {
-                    if (child.isMesh) {
-                        let searchString = child.name.toLowerCase();
-                        
-                        // マテリアルの名前もチェックに含める
-                        if (child.material) {
-                            if (Array.isArray(child.material)) {
-                                searchString += " " + child.material.map(m => m.name.toLowerCase()).join(' ');
-                            } else if (child.material.name) {
-                                searchString += " " + child.material.name.toLowerCase();
-                            }
-                        }
-                        
-                        // 親グループの名前もチェックに含める
-                        if (child.parent && child.parent.name) {
-                            searchString += " " + child.parent.name.toLowerCase();
-                        }
-
-                        // キーワードに一致するかチェック（ブレーキ部品などは除外）
-                        const isMatch = wheelKeywords.some(kw => searchString.includes(kw)) && !excludeKeywords.some(kw => searchString.includes(kw));
-
-                        if (isMatch) {
-                            allWheels.push(child); // タイヤリストに追加
-                            
-                            // 前輪ならステアリング（左右の曲がり）用のリストにも追加
-                            if (searchString.includes('front') || searchString.includes(' fl ') || searchString.includes(' fr ') || searchString.includes('f_') || searchString.includes('_f')) {
-                                frontWheels.push(child);
-                            }
-                        }
-                    }
-                });
 
                 const loadingScreen = document.getElementById('loading');
                 if (loadingScreen) loadingScreen.style.display = 'none';
@@ -335,22 +296,6 @@
                 porsche.rotation.y = carAngle - Math.PI / 2;
                 porsche.position.x += Math.sin(carAngle) * carSpeed;
                 porsche.position.z += Math.cos(carAngle) * carSpeed;
-
-                // 🛞 修正: 回転角を累積してタイヤを転がす
-                tireRotation -= carSpeed * 0.5; // 回転スピード
-                
-                allWheels.forEach(wheel => {
-                    wheel.rotation.order = 'YXZ'; // 回転の計算順序を固定
-                    wheel.rotation.x = tireRotation;
-                });
-
-                // ハンドルの切れ角（前輪の左右）
-                let targetSteer = 0;
-                if (controls.left) targetSteer = 0.4;
-                if (controls.right) targetSteer = -0.4;
-                frontWheels.forEach(wheel => {
-                    wheel.rotation.y = targetSteer;
-                });
 
                 const radius = 6.5;
                 camera.position.x = porsche.position.x + Math.sin(camAngleX) * radius;
