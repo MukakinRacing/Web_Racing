@@ -13,7 +13,7 @@
         body { 
             margin: 0; 
             overflow: hidden; 
-            background: #0a0a0a; 
+            background: #87ceeb; 
             font-family: sans-serif; 
             user-select: none; 
             -webkit-user-select: none; 
@@ -32,6 +32,7 @@
             font-size: 24px; 
             z-index: 10;
             font-family: monospace;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.4);
         }
 
         @keyframes placeholder-dots {
@@ -49,10 +50,10 @@
             position: absolute; 
             width: 90px; 
             height: 90px; 
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255, 255, 255, 0.4); 
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.5); 
             border-radius: 50%; 
-            color: white;
+            color: #333;
             font-size: 32px; 
             font-weight: bold; 
             display: flex; 
@@ -60,34 +61,37 @@
             justify-content: center;
             touch-action: none; 
             z-index: 5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
         .ui-btn:active { 
-            background: rgba(255, 255, 255, 0.4); 
+            background: rgba(255, 255, 255, 0.5); 
         }
         #btn-left { bottom: 40px; left: 40px; }
         #btn-right { bottom: 40px; left: 160px; }
         #btn-accel { 
             bottom: 140px; 
             right: 50px; 
-            background: rgba(0, 255, 100, 0.2); 
-            border-color: rgba(0, 255, 100, 0.5); 
+            background: rgba(0, 255, 100, 0.4); 
+            border-color: rgba(0, 255, 100, 0.6); 
+            color: white;
         }
         #btn-brake { 
             bottom: 30px; 
             right: 50px; 
-            background: rgba(255, 50, 50, 0.2); 
-            border-color: rgba(255, 50, 50, 0.5); 
+            background: rgba(255, 50, 50, 0.4); 
+            border-color: rgba(255, 50, 50, 0.6); 
+            color: white;
         }
 
         #hud { 
             position: absolute; 
             top: 20px; 
             left: 20px; 
-            color: white; 
+            color: #222; 
             font-size: 24px; 
             font-family: monospace; 
             z-index: 5; 
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
         }
     </style>
 </head>
@@ -96,7 +100,7 @@
     <div id="loading">Loading<span class="dots"></span></div>
 
     <div id="hud">
-        <div style="color: #00ff66; font-weight: bold;">911 GT3 R</div>
+        <div style="color: #ff3300; font-weight: bold;">911 GT3 R</div>
         <div><span id="speed">0</span> km/h</div>
     </div>
 
@@ -110,22 +114,25 @@
     <script>
         const canvas = document.getElementById('game-canvas');
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x0a0a0a, 0.015);
+        
+        // 背景を青空の色にして、遠くに行くほど空に溶け込むフォグ（霧）を設定
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         scene.add(ambientLight);
 
         const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight1.position.set(5, 15, 5);
+        dirLight1.position.set(20, 40, 20);
         scene.add(dirLight1);
 
-        const dirLight2 = new THREE.DirectionalLight(0x00aaff, 0.3);
-        dirLight2.position.set(-5, 5, -5);
+        const dirLight2 = new THREE.DirectionalLight(0xffeebb, 0.3);
+        dirLight2.position.set(-20, 20, -20);
         scene.add(dirLight2);
 
         let carSpeed = 0;
@@ -207,7 +214,7 @@
                 porsche.traverse((child) => {
                     if (child.isMesh) {
                         const name = child.name.toLowerCase();
-                        if (name.includes('wheel') || name.includes('tire') || name.includes('rim')) {
+                        if (name.includes('wheel') || name.includes('tire') || name.includes('rim') || name.includes('hub')) {
                             allWheels.push(child);
                             if (name.includes('front') || name.includes('_fl') || name.includes('_fr')) {
                                 frontWheels.push(child);
@@ -225,16 +232,26 @@
             }
         );
 
+        // 🛣️ 道路の作成
         const roadGeo = new THREE.PlaneGeometry(15, 25000);
-        const roadMat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a });
+        const roadMat = new THREE.MeshBasicMaterial({ color: 0x2e2e2e });
         const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
         road.position.set(0, -0.05, 0);
         scene.add(road);
 
+        // 🌿 草原（緑の地面プレート）の作成
+        const groundGeo = new THREE.PlaneGeometry(2000, 25000);
+        const groundMat = new THREE.MeshBasicMaterial({ color: 0x3b7a57 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(0, -0.06, 0);
+        scene.add(ground);
+
+        // ⚪ センターラインの配置
         for (let i = -500; i < 500; i++) {
             const lineGeo = new THREE.PlaneGeometry(0.3, 8);
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const line = new THREE.Mesh(lineGeo, lineMat);
             line.rotation.x = -Math.PI / 2;
             line.position.set(0, -0.04, i * 25);
@@ -268,8 +285,17 @@
                 porsche.position.x += Math.sin(carAngle) * carSpeed;
                 porsche.position.z += Math.cos(carAngle) * carSpeed;
 
+                // タイヤをローカル軸で回転させることで確実に自転させる
                 allWheels.forEach(wheel => {
-                    wheel.rotation.x -= carSpeed * 0.2;
+                    wheel.rotateX(-carSpeed * 0.3);
+                });
+
+                // 曲がるときに前輪を傾ける（ステアリング処理）
+                let targetSteer = 0;
+                if (controls.left) targetSteer = 0.35;
+                if (controls.right) targetSteer = -0.35;
+                frontWheels.forEach(wheel => {
+                    wheel.rotation.y = targetSteer;
                 });
 
                 const radius = 6.5;
